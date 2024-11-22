@@ -1,8 +1,8 @@
-from .metrics.verbmem import eval as eval_verbmem
-from .metrics.privleak import eval as eval_privleak
-from .metrics.knowmem import eval as eval_knowmem
-from .utils import load_model, load_tokenizer, write_csv, read_json, write_json
-from .constants import SUPPORTED_METRICS, CORPORA, LLAMA_DIR, DEFAULT_DATA, AUC_RETRAIN
+from metrics.verbmem import eval as eval_verbmem
+from metrics.privleak import eval as eval_privleak
+from metrics.knowmem import eval as eval_knowmem
+from utils import load_model, load_tokenizer, write_csv, read_json, write_json
+from constants import SUPPORTED_METRICS, CORPORA, LLAMA_DIR, DEFAULT_DATA, AUC_RETRAIN
 
 import os
 from transformers import LlamaForCausalLM, LlamaTokenizer
@@ -62,23 +62,28 @@ def eval_model(
         if temp_dir is not None:
             write_json(agg, os.path.join(temp_dir, "verbmem_f/agg.json"))
             write_json(log, os.path.join(temp_dir, "verbmem_f/log.json"))
+        print("verbmem_f: ", agg[verbmem_agg_key] * 100)
         out['verbmem_f'] = agg[verbmem_agg_key] * 100
 
-    # 2. privleak
-    if 'privleak' in metrics:
-        auc, log = eval_privleak(
-            forget_data=read_json(privleak_forget_file),
-            retain_data=read_json(privleak_retain_file),
-            holdout_data=read_json(privleak_holdout_file),
-            model=model, tokenizer=tokenizer
-        )
-        if temp_dir is not None:
-            write_json(auc, os.path.join(temp_dir, "privleak/auc.json"))
-            write_json(log, os.path.join(temp_dir, "privleak/log.json"))
-        out['privleak'] = (auc[privleak_auc_key] - AUC_RETRAIN[privleak_auc_key]) / AUC_RETRAIN[privleak_auc_key] * 100
+    # # 2. privleak
+    # if 'privleak' in metrics:
+    #     auc, log = eval_privleak(
+    #         forget_data=read_json(privleak_forget_file),
+    #         retain_data=read_json(privleak_retain_file),
+    #         holdout_data=read_json(privleak_holdout_file),
+    #         model=model, tokenizer=tokenizer
+    #     )
+    #     if temp_dir is not None:
+    #         write_json(auc, os.path.join(temp_dir, "privleak/auc.json"))
+    #         write_json(log, os.path.join(temp_dir, "privleak/log.json"))
+    #     out['privleak'] = (auc[privleak_auc_key] - AUC_RETRAIN[privleak_auc_key]) / AUC_RETRAIN[privleak_auc_key] * 100
 
     # 3. knowmem_f
     if 'knowmem_f' in metrics:
+        if knowmem_forget_qa_file==None:
+            knowmem_forget_qa_file = "/n/home04/huandongchang/muse_bench/data/books/knowmem/forget_qa.json"
+        if knowmem_forget_qa_icl_file==None:
+            knowmem_forget_qa_icl_file = "/n/home04/huandongchang/muse_bench/data/books/knowmem/forget_qa_icl.json"
         qa = read_json(knowmem_forget_qa_file)
         icl = read_json(knowmem_forget_qa_icl_file)
         agg, log = eval_knowmem(
@@ -96,6 +101,11 @@ def eval_model(
 
     # 4. knowmem_r
     if 'knowmem_r' in metrics:
+        if knowmem_retain_qa_file==None:
+            knowmem_retain_qa_file = "/n/home04/huandongchang/muse_bench/data/books/knowmem/retain_qa.json"
+        if knowmem_retain_qa_icl_file==None:
+            knowmem_retain_qa_icl_file = "/n/home04/huandongchang/muse_bench/data/books/knowmem/retain_qa_icl.json"
+            
         qa = read_json(knowmem_retain_qa_file)
         icl = read_json(knowmem_retain_qa_icl_file)
         agg, log = eval_knowmem(
@@ -136,6 +146,7 @@ def load_then_eval_models(
     for model_dir, name in zip(model_dirs, names):
         model = load_model(model_dir)
         tokenizer = load_tokenizer(tokenizer_dir)
+        tokenizer.pad_token = tokenizer.eos_token
         res = eval_model(
             model, tokenizer, metrics, corpus,
             temp_dir=os.path.join(temp_dir, name)
@@ -155,4 +166,4 @@ if __name__ == '__main__':
     parser.add_argument('--out_file', type=str, required=True)
     parser.add_argument('--metrics', type=str, nargs='+', default=SUPPORTED_METRICS)
     args = parser.parse_args()
-    load_then_eval_models(**args)
+    load_then_eval_models(**vars(args))

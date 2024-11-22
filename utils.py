@@ -27,13 +27,20 @@ def write_text(obj: str, fpath: str):
         return f.write(obj)
 
 
+# def write_csv(obj, fpath: str):
+#     os.makedirs(os.path.dirname(fpath), exist_ok=True)
+#     pd.DataFrame(obj).to_csv(fpath, index=False)
+
 def write_csv(obj, fpath: str):
-    os.makedirs(os.path.dirname(fpath), exist_ok=True)
+    # Ensure the directory exists only if the directory part is not empty
+    dir_name = os.path.dirname(fpath)
+    if dir_name:  # Avoid calling os.makedirs with an empty string
+        os.makedirs(dir_name, exist_ok=True)
     pd.DataFrame(obj).to_csv(fpath, index=False)
 
 
 def load_model(model_dir: str, **kwargs):
-    return AutoModelForCausalLM.from_pretrained(model_dir, **kwargs)
+    return AutoModelForCausalLM.from_pretrained(model_dir, **kwargs).to('cuda')
 
 
 def load_tokenizer(tokenizer_dir: str, **kwargs):
